@@ -1,0 +1,31 @@
+[
+  {
+    "question": "Why is checkout-service returning HTTP 500 errors?",
+    "expected_route": "incident_investigation",
+    "expected_service_name": "checkout-service"
+  },
+  {
+    "question": "Who owns payment-service?",
+    "expected_route": "service_lookup",
+    "expected_service_name": "payment-service"
+  },
+  {
+    "question": "What changed in checkout-service v2.1.0?",
+    "expected_route": "deployment_analysis",
+    "expected_service_name": "checkout-service",
+    "expected_deployment_id": "v2.1.0"
+  },
+  {
+    "question": "Find the migration rollback runbook.",
+    "expected_route": "runbook_search"
+  },
+  {
+    "question": "Generate a postmortem for INC-001.",
+    "expected_route": "report_generation",
+    "expected_incident_id": "INC-001"
+  },
+  {
+    "question": "What is FastAPI?",
+    "expected_route": "general_question"
+  }
+]

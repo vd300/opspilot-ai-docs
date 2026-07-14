@@ -94,15 +94,15 @@ A task may only be marked completed after:
 
 # Phase 4: Router
 
-- [ ] Define RouteDecision schema
-- [ ] Implement router prompt
-- [ ] Implement structured output parsing
-- [ ] Add fallback routing rules
-- [ ] Test incident investigation route
-- [ ] Test service lookup route
-- [ ] Test deployment analysis route
-- [ ] Test runbook route
-- [ ] Test unsupported request behavior
+- [x] Define RouteDecision schema
+- [x] Implement router prompt
+- [x] Implement structured output parsing
+- [x] Add fallback routing rules
+- [x] Test incident investigation route
+- [x] Test service lookup route
+- [x] Test deployment analysis route
+- [x] Test runbook route
+- [x] Test unsupported request behavior
 
 # Phase 5: Basic LangGraph workflow
 
