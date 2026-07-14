@@ -1,9 +1,17 @@
 from app.shopflow.models.shopflow import (
+    ChangeKind,
+    DependencyKind,
     DeploymentChange,
     DeploymentRecord,
+    DeploymentStatus,
+    Environment,
     EvidenceReference,
+    EvidenceType,
+    HealthStatus,
     IncidentScenario,
     LogEvent,
+    LogLevel,
+    MetricName,
     MetricSnapshot,
     Runbook,
     RunbookStep,
@@ -13,11 +21,19 @@ from app.shopflow.models.shopflow import (
 )
 
 __all__ = [
+    "ChangeKind",
+    "DependencyKind",
     "DeploymentChange",
     "DeploymentRecord",
+    "DeploymentStatus",
+    "Environment",
     "EvidenceReference",
+    "EvidenceType",
+    "HealthStatus",
     "IncidentScenario",
     "LogEvent",
+    "LogLevel",
+    "MetricName",
     "MetricSnapshot",
     "Runbook",
     "RunbookStep",
@@ -25,4 +41,3 @@ __all__ = [
     "ServiceDependency",
     "ServiceOwner",
 ]
-

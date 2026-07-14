@@ -81,16 +81,16 @@ A task may only be marked completed after:
 
 # Phase 3: Mock tools
 
-- [ ] Implement search_logs
-- [ ] Implement get_metrics
-- [ ] Implement get_recent_deployments
-- [ ] Implement get_deployment_diff
-- [ ] Implement search_runbooks
-- [ ] Implement get_service_owner
-- [ ] Implement get_service_dependencies
-- [ ] Add tool input validation
-- [ ] Add tool output schemas
-- [ ] Add tool failure tests
+- [x] Implement search_logs
+- [x] Implement get_metrics
+- [x] Implement get_recent_deployments
+- [x] Implement get_deployment_diff
+- [x] Implement search_runbooks
+- [x] Implement get_service_owner
+- [x] Implement get_service_dependencies
+- [x] Add tool input validation
+- [x] Add tool output schemas
+- [x] Add tool failure tests
 
 # Phase 4: Router
 
