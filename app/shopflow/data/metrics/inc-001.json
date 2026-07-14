@@ -1,0 +1,52 @@
+[
+  {
+    "metric_id": "metric-inc001-1359-500-rate",
+    "timestamp": "2026-07-14T13:59:00+05:30",
+    "service_name": "checkout-service",
+    "environment": "production",
+    "metric_name": "http_500_rate_percent",
+    "value": 1.1,
+    "unit": "percent",
+    "labels": {
+      "route": "POST /checkout/complete"
+    }
+  },
+  {
+    "metric_id": "metric-inc001-1404-500-rate",
+    "timestamp": "2026-07-14T14:04:00+05:30",
+    "service_name": "checkout-service",
+    "environment": "production",
+    "metric_name": "http_500_rate_percent",
+    "value": 23.2,
+    "unit": "percent",
+    "labels": {
+      "route": "POST /checkout/complete"
+    }
+  },
+  {
+    "metric_id": "metric-inc001-1404-insert-errors",
+    "timestamp": "2026-07-14T14:04:00+05:30",
+    "service_name": "checkout-service",
+    "environment": "production",
+    "metric_name": "database_insert_errors_per_minute",
+    "value": 47,
+    "unit": "errors_per_minute",
+    "labels": {
+      "database": "order-database",
+      "table": "orders"
+    }
+  },
+  {
+    "metric_id": "metric-inc001-1404-latency",
+    "timestamp": "2026-07-14T14:04:00+05:30",
+    "service_name": "checkout-service",
+    "environment": "production",
+    "metric_name": "p95_latency_ms",
+    "value": 680,
+    "unit": "milliseconds",
+    "labels": {
+      "route": "POST /checkout/complete"
+    }
+  }
+]
+

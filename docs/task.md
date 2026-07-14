@@ -57,27 +57,27 @@ A task may only be marked completed after:
 
 # Phase 2: ShopFlow simulated environment
 
-- [ ] Define service catalog schema
-- [ ] Add checkout-service
-- [ ] Add payment-service
-- [ ] Add inventory-service
-- [ ] Add notification-service
-- [ ] Define dependency graph
-- [ ] Add service ownership data
-- [ ] Define log event schema
-- [ ] Define metric snapshot schema
-- [ ] Define deployment schema
-- [ ] Define runbook schema
-- [ ] Add INC-001 data
-- [ ] Add tests for INC-001 data consistency
+- [x] Define service catalog schema
+- [x] Add checkout-service
+- [x] Add payment-service
+- [x] Add inventory-service
+- [x] Add notification-service
+- [x] Define dependency graph
+- [x] Add service ownership data
+- [x] Define log event schema
+- [x] Define metric snapshot schema
+- [x] Define deployment schema
+- [x] Define runbook schema
+- [x] Add INC-001 data
+- [x] Add tests for INC-001 data consistency
 
 ## INC-001 consistency checks
 
-- [ ] Deployment time precedes error spike
-- [ ] Logs contain insert failure
-- [ ] Deployment contains database migration
-- [ ] Metrics contain HTTP 500 increase
-- [ ] Runbook contains safe rollback guidance
+- [x] Deployment time precedes error spike
+- [x] Logs contain insert failure
+- [x] Deployment contains database migration
+- [x] Metrics contain HTTP 500 increase
+- [x] Runbook contains safe rollback guidance
 
 # Phase 3: Mock tools
 

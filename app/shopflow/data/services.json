@@ -1,0 +1,43 @@
+[
+  {
+    "service_name": "checkout-service",
+    "description": "Creates checkout sessions and writes completed orders.",
+    "owner_id": "team-checkout",
+    "repository_name": "shopflow-checkout-service",
+    "environment": "production",
+    "health_status": "degraded"
+  },
+  {
+    "service_name": "payment-service",
+    "description": "Authorizes and captures customer payments.",
+    "owner_id": "team-payments",
+    "repository_name": "shopflow-payment-service",
+    "environment": "production",
+    "health_status": "healthy"
+  },
+  {
+    "service_name": "inventory-service",
+    "description": "Reserves product inventory during checkout.",
+    "owner_id": "team-inventory",
+    "repository_name": "shopflow-inventory-service",
+    "environment": "production",
+    "health_status": "healthy"
+  },
+  {
+    "service_name": "notification-service",
+    "description": "Sends order confirmation and failure notifications.",
+    "owner_id": "team-notifications",
+    "repository_name": "shopflow-notification-service",
+    "environment": "production",
+    "health_status": "healthy"
+  },
+  {
+    "service_name": "order-database",
+    "description": "Stores order and checkout records for ShopFlow.",
+    "owner_id": "team-data-platform",
+    "repository_name": "shopflow-order-schema",
+    "environment": "production",
+    "health_status": "not_applicable"
+  }
+]
+

@@ -1,0 +1,29 @@
+[
+  {
+    "deployment_id": "deploy-checkout-20260714-1400",
+    "service_name": "checkout-service",
+    "environment": "production",
+    "version": "v2.1.0",
+    "deployed_at": "2026-07-14T14:00:00+05:30",
+    "deployed_by": "checkout-platform-ci",
+    "status": "succeeded",
+    "pipeline_url": "https://ci.shopflow.example/pipelines/checkout/20260714.1400",
+    "changes": [
+      {
+        "change_id": "chg-checkout-api-210",
+        "change_type": "application",
+        "description": "Adds region-aware shipping calculation to checkout completion.",
+        "path": "services/checkout/checkout_handler.py",
+        "risk_level": "medium"
+      },
+      {
+        "change_id": "chg-orders-shipping-region",
+        "change_type": "database_migration",
+        "description": "Adds required shipping_region column to orders table.",
+        "path": "migrations/20260714_1400_add_shipping_region.sql",
+        "risk_level": "high"
+      }
+    ]
+  }
+]
+

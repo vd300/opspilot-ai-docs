@@ -1,0 +1,55 @@
+[
+  {
+    "incident_id": "INC-001",
+    "title": "Checkout HTTP 500 spike after v2.1.0 deployment",
+    "environment": "production",
+    "service_name": "checkout-service",
+    "starts_at": "2026-07-14T14:03:00+05:30",
+    "evidence": [
+      {
+        "evidence_id": "ev-inc001-deploy",
+        "evidence_type": "deployment",
+        "source_id": "deploy-checkout-20260714-1400",
+        "description": "checkout-service v2.1.0 was deployed shortly before failures began."
+      },
+      {
+        "evidence_id": "ev-inc001-log-insert",
+        "evidence_type": "log",
+        "source_id": "log-inc001-140301",
+        "description": "Order insert failure recorded by checkout-service."
+      },
+      {
+        "evidence_id": "ev-inc001-log-http500",
+        "evidence_type": "log",
+        "source_id": "log-inc001-140325",
+        "description": "Checkout API returned HTTP 500 after order write failure."
+      },
+      {
+        "evidence_id": "ev-inc001-metric-spike",
+        "evidence_type": "metric",
+        "source_id": "metric-inc001-1404-500-rate",
+        "description": "HTTP 500 rate increased at 14:04."
+      },
+      {
+        "evidence_id": "ev-inc001-runbook",
+        "evidence_type": "runbook",
+        "source_id": "rb-checkout-db-write-failures",
+        "description": "Runbook covers checkout database write failures after deployments."
+      },
+      {
+        "evidence_id": "ev-inc001-dependency",
+        "evidence_type": "dependency",
+        "source_id": "dep-checkout-orders",
+        "description": "checkout-service depends on order-database for order writes."
+      }
+    ],
+    "related_services": [
+      "checkout-service",
+      "order-database",
+      "payment-service",
+      "inventory-service",
+      "notification-service"
+    ],
+    "related_runbook_ids": ["rb-checkout-db-write-failures"]
+  }
+]

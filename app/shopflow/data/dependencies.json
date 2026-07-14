@@ -1,0 +1,35 @@
+[
+  {
+    "dependency_id": "dep-checkout-payment",
+    "source_service": "checkout-service",
+    "target_service": "payment-service",
+    "dependency_type": "http",
+    "description": "Checkout calls payment-service to authorize payment before order creation.",
+    "required": true
+  },
+  {
+    "dependency_id": "dep-checkout-inventory",
+    "source_service": "checkout-service",
+    "target_service": "inventory-service",
+    "dependency_type": "http",
+    "description": "Checkout reserves inventory for each line item.",
+    "required": true
+  },
+  {
+    "dependency_id": "dep-checkout-orders",
+    "source_service": "checkout-service",
+    "target_service": "order-database",
+    "dependency_type": "database",
+    "description": "Checkout writes completed orders into order-database.",
+    "required": true
+  },
+  {
+    "dependency_id": "dep-checkout-notifications",
+    "source_service": "checkout-service",
+    "target_service": "notification-service",
+    "dependency_type": "event",
+    "description": "Checkout emits order-created events for customer notifications.",
+    "required": false
+  }
+]
+

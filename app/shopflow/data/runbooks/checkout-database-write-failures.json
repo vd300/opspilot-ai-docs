@@ -1,0 +1,41 @@
+[
+  {
+    "runbook_id": "rb-checkout-db-write-failures",
+    "title": "Checkout database write failures",
+    "service_names": ["checkout-service", "order-database"],
+    "summary": "Use this runbook when checkout order writes fail after a deployment or schema change.",
+    "symptoms": [
+      "HTTP 500 responses on POST /checkout/complete",
+      "Database insert failures in checkout-service logs",
+      "Recent deployment includes database migration"
+    ],
+    "steps": [
+      {
+        "step_id": "rb-step-001",
+        "title": "Confirm recent deployment",
+        "action": "Compare the first failing checkout log timestamp with the latest checkout-service deployment timestamp.",
+        "requires_approval": false
+      },
+      {
+        "step_id": "rb-step-002",
+        "title": "Inspect migration changes",
+        "action": "Review database migration changes for new required columns, constraints, or missing defaults.",
+        "requires_approval": false
+      },
+      {
+        "step_id": "rb-step-003",
+        "title": "Prepare safe rollback",
+        "action": "If the migration is causing failed writes, prepare a rollback plan for the application and migration; require incident commander approval before production changes.",
+        "requires_approval": true
+      },
+      {
+        "step_id": "rb-step-004",
+        "title": "Correct migration",
+        "action": "Add a safe default or backfill path for the required column before reapplying the schema change.",
+        "requires_approval": true
+      }
+    ],
+    "related_evidence_types": ["deployment", "log", "metric"]
+  }
+]
+

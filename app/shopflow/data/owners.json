@@ -1,0 +1,33 @@
+[
+  {
+    "owner_id": "team-checkout",
+    "team_name": "Checkout Platform",
+    "contact_email": "checkout-platform@shopflow.example",
+    "escalation_channel": "#shopflow-checkout-oncall"
+  },
+  {
+    "owner_id": "team-payments",
+    "team_name": "Payments",
+    "contact_email": "payments@shopflow.example",
+    "escalation_channel": "#shopflow-payments-oncall"
+  },
+  {
+    "owner_id": "team-inventory",
+    "team_name": "Inventory",
+    "contact_email": "inventory@shopflow.example",
+    "escalation_channel": "#shopflow-inventory-oncall"
+  },
+  {
+    "owner_id": "team-notifications",
+    "team_name": "Customer Messaging",
+    "contact_email": "notifications@shopflow.example",
+    "escalation_channel": "#shopflow-notifications-oncall"
+  },
+  {
+    "owner_id": "team-data-platform",
+    "team_name": "Data Platform",
+    "contact_email": "data-platform@shopflow.example",
+    "escalation_channel": "#shopflow-data-oncall"
+  }
+]
+

@@ -1,0 +1,53 @@
+[
+  {
+    "event_id": "log-inc001-140000",
+    "timestamp": "2026-07-14T14:00:00+05:30",
+    "service_name": "checkout-service",
+    "environment": "production",
+    "level": "INFO",
+    "message": "Deployment v2.1.0 activated for checkout-service.",
+    "component": "deployment-listener",
+    "trace_id": null,
+    "error_code": null,
+    "fields": {
+      "deployment_id": "deploy-checkout-20260714-1400",
+      "version": "v2.1.0"
+    }
+  },
+  {
+    "event_id": "log-inc001-140301",
+    "timestamp": "2026-07-14T14:03:01+05:30",
+    "service_name": "checkout-service",
+    "environment": "production",
+    "level": "ERROR",
+    "message": "Database insert failed while creating order.",
+    "component": "order-writer",
+    "trace_id": "trace-shopflow-9001",
+    "error_code": "DB_INSERT_FAILED",
+    "fields": {
+      "table": "orders",
+      "operation": "insert",
+      "database": "order-database",
+      "constraint": "orders_shipping_region_not_null",
+      "missing_field": "shipping_region"
+    }
+  },
+  {
+    "event_id": "log-inc001-140325",
+    "timestamp": "2026-07-14T14:03:25+05:30",
+    "service_name": "checkout-service",
+    "environment": "production",
+    "level": "ERROR",
+    "message": "Checkout completion returned HTTP 500 after order insert failure.",
+    "component": "checkout-api",
+    "trace_id": "trace-shopflow-9002",
+    "error_code": "CHECKOUT_WRITE_ERROR",
+    "fields": {
+      "endpoint": "POST /checkout/complete",
+      "status_code": 500,
+      "upstream": "order-database",
+      "missing_field": "shipping_region"
+    }
+  }
+]
+
