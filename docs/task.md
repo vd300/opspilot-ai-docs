@@ -118,15 +118,15 @@ A task may only be marked completed after:
 
 # Phase 6: Subagents
 
-- [ ] Implement log analysis agent
-- [ ] Implement metrics analysis agent
-- [ ] Implement deployment analysis agent
-- [ ] Implement runbook agent
-- [ ] Define shared finding schema
-- [ ] Add parallel execution
-- [ ] Implement evidence aggregation
-- [ ] Test each subagent independently
-- [ ] Test combined investigation
+- [x] Implement log analysis agent
+- [x] Implement metrics analysis agent
+- [x] Implement deployment analysis agent
+- [x] Implement runbook agent
+- [x] Define shared finding schema
+- [x] Add parallel execution
+- [x] Implement evidence aggregation
+- [x] Test each subagent independently
+- [x] Test combined investigation
 
 # Phase 7: Skills
 

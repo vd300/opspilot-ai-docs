@@ -6,6 +6,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.graph.dependencies import GraphDependencies, get_graph_dependencies
 from app.graph.nodes import (
+    aggregate_evidence,
     create_investigation_plan,
     deployment_analysis_response,
     general_question_response,
@@ -13,6 +14,7 @@ from app.graph.nodes import (
     make_route_request_node,
     report_generation_response,
     runbook_search_response,
+    run_specialist_analysis,
     service_lookup_response,
     unsupported_route_response,
     validate_request,
@@ -31,6 +33,8 @@ def compile_investigation_graph(dependencies: GraphDependencies | None = None):
     graph.add_node("validate_request", validate_request)
     graph.add_node("route_request", make_route_request_node(dependencies))
     graph.add_node("create_investigation_plan", create_investigation_plan)
+    graph.add_node("run_specialist_analysis", run_specialist_analysis)
+    graph.add_node("aggregate_evidence", aggregate_evidence)
     graph.add_node("generate_investigation_response", generate_investigation_response)
     graph.add_node("service_lookup_response", service_lookup_response)
     graph.add_node("deployment_analysis_response", deployment_analysis_response)
@@ -44,7 +48,9 @@ def compile_investigation_graph(dependencies: GraphDependencies | None = None):
     route_node_map = {node: node for node in ROUTE_TO_NODE.values()}
     route_node_map["unsupported_route_response"] = "unsupported_route_response"
     graph.add_conditional_edges("route_request", select_route_node, route_node_map)
-    graph.add_edge("create_investigation_plan", "generate_investigation_response")
+    graph.add_edge("create_investigation_plan", "run_specialist_analysis")
+    graph.add_edge("run_specialist_analysis", "aggregate_evidence")
+    graph.add_edge("aggregate_evidence", "generate_investigation_response")
     graph.add_edge("generate_investigation_response", END)
     graph.add_edge("service_lookup_response", END)
     graph.add_edge("deployment_analysis_response", END)
@@ -70,6 +76,12 @@ def _initial_state(payload: InvestigationRequest, request_id: str | None) -> Inv
         "route_reason": None,
         "fallback_used": False,
         "investigation_plan": [],
+        "specialist_findings": [],
+        "evidence": [],
+        "preliminary_diagnosis": None,
+        "recommendations": [],
+        "confidence": None,
+        "requires_approval": False,
         "active_agent": None,
         "final_response": None,
         "errors": [],

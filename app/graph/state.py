@@ -14,6 +14,12 @@ class InvestigationState(TypedDict, total=False):
     route_reason: str | None
     fallback_used: bool
     investigation_plan: list[str]
+    specialist_findings: list[dict[str, Any]]
+    evidence: list[dict[str, Any]]
+    preliminary_diagnosis: str | None
+    recommendations: list[str]
+    confidence: float | None
+    requires_approval: bool
     active_agent: str | None
     final_response: dict[str, Any] | None
     errors: list[str]

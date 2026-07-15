@@ -31,3 +31,9 @@ class InvestigationResponse(BaseModel):
     status: str
     investigation_plan: list[str] = Field(default_factory=list)
     message: str
+    specialist_findings: list[dict] = Field(default_factory=list)
+    evidence: list[dict] = Field(default_factory=list)
+    preliminary_diagnosis: str | None = None
+    recommendations: list[str] = Field(default_factory=list)
+    confidence: float | None = None
+    requires_approval: bool = False

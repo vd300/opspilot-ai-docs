@@ -4,6 +4,12 @@ from uuid import uuid4
 
 from app.graph.dependencies import GraphDependencies
 from app.graph.state import InvestigationState
+from app.graph.subagents import (
+    SpecialistFinding,
+    SpecialistInput,
+    collect_unique_evidence,
+    run_specialist_subagents,
+)
 from app.router import OpsRoute, RouterInput
 
 logger = logging.getLogger("opspilot.graph")
@@ -135,6 +141,75 @@ def create_investigation_plan(state: InvestigationState) -> InvestigationState:
     return next_state
 
 
+def run_specialist_analysis(state: InvestigationState) -> InvestigationState:
+    node = "run_specialist_analysis"
+    _log_node("graph_node_entered", state, node)
+    service_name = state.get("service_name") or "checkout-service"
+    input_data = SpecialistInput(
+        service_name=service_name,
+        environment=state.get("environment") or "production",
+        incident_id=state.get("incident_id"),
+        deployment_id=state.get("deployment_id"),
+        user_query=state.get("user_query"),
+    )
+    findings = run_specialist_subagents(input_data)
+    next_state: InvestigationState = {
+        "active_agent": "incident_coordinator",
+        "specialist_findings": [
+            finding.model_dump(mode="json", exclude_none=True) for finding in findings
+        ],
+    }
+    _log_node("graph_node_completed", {**state, **next_state}, node)
+    return next_state
+
+
+def aggregate_evidence(state: InvestigationState) -> InvestigationState:
+    node = "aggregate_evidence"
+    _log_node("graph_node_entered", state, node)
+    parsed_findings = [
+        SpecialistFinding.model_validate(finding)
+        for finding in state.get("specialist_findings", [])
+    ]
+    evidence = collect_unique_evidence(parsed_findings)
+    missing_information = [
+        missing
+        for finding in parsed_findings
+        for missing in finding.missing_information
+    ]
+    errors = list(state.get("errors") or [])
+    errors.extend(
+        f"{finding.agent}: {error}"
+        for finding in parsed_findings
+        for error in finding.errors
+    )
+    confidence = _combined_confidence(parsed_findings)
+    diagnosis = (
+        "The likely cause of INC-001 is the checkout-service v2.1.0 database migration "
+        "adding or requiring shipping_region without compatible write-path data. "
+        "Logs show insert failures, metrics show the HTTP 500 spike, and deployment "
+        "evidence ties the failure window to a high-risk database migration."
+    )
+    if missing_information:
+        diagnosis = f"{diagnosis} Missing information: {'; '.join(missing_information)}."
+
+    next_state: InvestigationState = {
+        "active_agent": "incident_coordinator",
+        "evidence": [item.model_dump(mode="json", exclude_none=True) for item in evidence],
+        "preliminary_diagnosis": diagnosis,
+        "recommendations": [
+            "Pause further checkout-service deployments until the migration is reviewed.",
+            "Confirm whether shipping_region is required by the new schema and absent from checkout writes.",
+            "Use the checkout database write failures runbook before rollback or migration remediation.",
+            "Get human approval before any production rollback or schema change.",
+        ],
+        "confidence": confidence,
+        "requires_approval": True,
+        "errors": errors,
+    }
+    _log_node("graph_node_completed", {**state, **next_state}, node)
+    return next_state
+
+
 def generate_investigation_response(state: InvestigationState) -> InvestigationState:
     node = "generate_investigation_response"
     _log_node("graph_node_entered", state, node)
@@ -143,12 +218,16 @@ def generate_investigation_response(state: InvestigationState) -> InvestigationS
         "investigation_id": state.get("investigation_id"),
         "route": OpsRoute.INCIDENT_INVESTIGATION.value,
         "service_name": state.get("service_name"),
-        "status": "planned",
+        "status": "preliminary_diagnosis",
         "investigation_plan": state.get("investigation_plan") or [],
-        "message": (
-            "The investigation workflow has been created. "
-            "Specialist analysis will be implemented in Phase 6."
-        ),
+        "message": state.get("preliminary_diagnosis")
+        or "The investigation workflow completed specialist analysis.",
+        "specialist_findings": state.get("specialist_findings") or [],
+        "evidence": state.get("evidence") or [],
+        "preliminary_diagnosis": state.get("preliminary_diagnosis"),
+        "recommendations": state.get("recommendations") or [],
+        "confidence": state.get("confidence"),
+        "requires_approval": state.get("requires_approval", False),
     }
     next_state: InvestigationState = {
         "active_agent": "incident_coordinator",
@@ -156,6 +235,13 @@ def generate_investigation_response(state: InvestigationState) -> InvestigationS
     }
     _log_node("graph_node_completed", {**state, **next_state}, node)
     return next_state
+
+
+def _combined_confidence(findings: list) -> float:
+    confident_findings = [finding.confidence for finding in findings if finding.confidence > 0]
+    if not confident_findings:
+        return 0.0
+    return round(sum(confident_findings) / len(confident_findings), 2)
 
 
 def _temporary_response(

@@ -173,7 +173,7 @@ def test_graph_compiles() -> None:
 @pytest.mark.parametrize(
     ("route", "expected_status", "expected_plan"),
     [
-        (OpsRoute.INCIDENT_INVESTIGATION, "planned", True),
+        (OpsRoute.INCIDENT_INVESTIGATION, "preliminary_diagnosis", True),
         (OpsRoute.SERVICE_LOOKUP, "selected", False),
         (OpsRoute.DEPLOYMENT_ANALYSIS, "selected", False),
         (OpsRoute.RUNBOOK_SEARCH, "selected", False),
@@ -228,8 +228,43 @@ def test_investigation_endpoint_accepts_valid_request() -> None:
     assert body["request_id"] == "api-investigation-1"
     assert body["investigation_id"]
     assert body["route"] == "incident_investigation"
-    assert body["status"] == "planned"
+    assert body["status"] == "preliminary_diagnosis"
     assert body["investigation_plan"]
+    assert body["specialist_findings"]
+    assert body["evidence"]
+    assert "database migration" in body["preliminary_diagnosis"]
+    assert body["requires_approval"] is True
+
+
+def test_investigation_workflow_produces_inc001_preliminary_diagnosis() -> None:
+    response = run_investigation_workflow(
+        InvestigationRequest(
+            question="Why is checkout-service returning HTTP 500 after the latest deployment?",
+            service_name="checkout-service",
+            incident_id="INC-001",
+            environment="production",
+        ),
+        request_id="req-inc001",
+        dependencies=deps(OpsRoute.INCIDENT_INVESTIGATION),
+    )
+
+    assert response.status == "preliminary_diagnosis"
+    assert response.preliminary_diagnosis is not None
+    assert "shipping_region" in response.preliminary_diagnosis
+    assert response.confidence is not None
+    assert response.confidence > 0.8
+    assert {finding["agent"] for finding in response.specialist_findings} == {
+        "deployment_analysis",
+        "log_analysis",
+        "metrics_analysis",
+        "runbook_analysis",
+    }
+    assert {item["source_id"] for item in response.evidence} >= {
+        "log-inc001-140301",
+        "metric-inc001-1404-500-rate",
+        "deploy-checkout-20260714-1400",
+        "rb-checkout-db-write-failures",
+    }
 
 
 def test_investigation_endpoint_rejects_empty_query() -> None:
