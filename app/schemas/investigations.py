@@ -37,3 +37,9 @@ class InvestigationResponse(BaseModel):
     recommendations: list[str] = Field(default_factory=list)
     confidence: float | None = None
     requires_approval: bool = False
+    active_agent: str | None = None
+    handoff_decision: dict | None = None
+    handoff_reason: str | None = None
+    handoff_target: str | None = None
+    handoff_timestamp: str | None = None
+    specialist_result: dict | None = None

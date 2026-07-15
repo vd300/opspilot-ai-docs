@@ -5,10 +5,13 @@ from app.graph.dependencies import GraphDependencies
 from app.graph.nodes import (
     WorkflowExecutionError,
     WorkflowValidationError,
+    assess_specialist_handoff,
     create_investigation_plan,
     make_route_request_node,
+    run_specialist_handoff,
     validate_request,
 )
+from app.graph.subagents import EvidenceItem, Hypothesis, SpecialistFinding
 from app.graph.routing import ROUTE_TO_NODE, select_route_node
 from app.graph.workflow import compile_investigation_graph, run_investigation_workflow
 from app.main import create_app
@@ -265,6 +268,66 @@ def test_investigation_workflow_produces_inc001_preliminary_diagnosis() -> None:
         "deploy-checkout-20260714-1400",
         "rb-checkout-db-write-failures",
     }
+    assert response.handoff_decision is not None
+    assert response.handoff_decision["should_handoff"] is True
+    assert response.handoff_target == "database_specialist"
+    assert response.handoff_reason
+    assert response.handoff_timestamp
+    assert response.specialist_result is not None
+    assert response.specialist_result["agent"] == "database_specialist"
+    assert response.active_agent == "incident_coordinator"
+
+
+def test_handoff_assessment_skips_non_database_evidence() -> None:
+    state = {
+        "active_agent": "incident_coordinator",
+        "specialist_findings": [
+            SpecialistFinding(
+                agent="metrics_analysis",
+                summary="Latency increased for external calls.",
+                evidence=[
+                    EvidenceItem(
+                        source_type="metric",
+                        source_id="metric-latency",
+                        location="shopflow.metrics",
+                        detail="p95 latency increased after an upstream timeout.",
+                    )
+                ],
+                hypotheses=[
+                    Hypothesis(
+                        description="External provider timeout increased latency.",
+                        confidence=0.7,
+                    )
+                ],
+                confidence=0.7,
+            ).model_dump(mode="json")
+        ],
+    }
+
+    result = assess_specialist_handoff(state)
+
+    assert result["handoff_decision"]["should_handoff"] is False
+    assert result["handoff_target"] is None
+    assert result["handoff_reason"] is None
+
+
+def test_invalid_handoff_target_fails_safely() -> None:
+    with pytest.raises(WorkflowExecutionError):
+        run_specialist_handoff(
+            {
+                "request_id": "req-invalid-handoff",
+                "investigation_id": "investigation-invalid-handoff",
+                "active_agent": "incident_coordinator",
+                "handoff_decision": {
+                    "should_handoff": True,
+                    "target_agent": "cache_specialist",
+                    "reason": "Unsupported target for coverage.",
+                    "confidence": 0.8,
+                    "evidence_ids": [],
+                },
+                "specialist_findings": [],
+            }
+        )
 
 
 def test_investigation_endpoint_rejects_empty_query() -> None:

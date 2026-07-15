@@ -141,15 +141,15 @@ A task may only be marked completed after:
 
 # Phase 8: Handoffs
 
-- [ ] Define HandoffDecision schema
-- [ ] Implement handoff assessment
-- [ ] Implement database specialist agent
-- [ ] Record active agent in state
-- [ ] Record handoff reason
-- [ ] Return specialist result to coordinator
-- [ ] Test positive handoff case
-- [ ] Test negative handoff case
-- [ ] Test invalid handoff target
+- [x] Define HandoffDecision schema
+- [x] Implement handoff assessment
+- [x] Implement database specialist agent
+- [x] Record active agent in state
+- [x] Record handoff reason
+- [x] Return specialist result to coordinator
+- [x] Test positive handoff case
+- [x] Test negative handoff case
+- [x] Test invalid handoff target
 
 # Phase 9: Persistence
 

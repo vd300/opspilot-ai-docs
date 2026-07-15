@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 from app.graph.dependencies import GraphDependencies, get_graph_dependencies
 from app.graph.nodes import (
     aggregate_evidence,
+    assess_specialist_handoff,
     create_investigation_plan,
     deployment_analysis_response,
     general_question_response,
@@ -15,6 +16,7 @@ from app.graph.nodes import (
     report_generation_response,
     runbook_search_response,
     run_specialist_analysis,
+    run_specialist_handoff,
     service_lookup_response,
     unsupported_route_response,
     validate_request,
@@ -35,6 +37,8 @@ def compile_investigation_graph(dependencies: GraphDependencies | None = None):
     graph.add_node("create_investigation_plan", create_investigation_plan)
     graph.add_node("run_specialist_analysis", run_specialist_analysis)
     graph.add_node("aggregate_evidence", aggregate_evidence)
+    graph.add_node("assess_specialist_handoff", assess_specialist_handoff)
+    graph.add_node("run_specialist_handoff", run_specialist_handoff)
     graph.add_node("generate_investigation_response", generate_investigation_response)
     graph.add_node("service_lookup_response", service_lookup_response)
     graph.add_node("deployment_analysis_response", deployment_analysis_response)
@@ -50,7 +54,9 @@ def compile_investigation_graph(dependencies: GraphDependencies | None = None):
     graph.add_conditional_edges("route_request", select_route_node, route_node_map)
     graph.add_edge("create_investigation_plan", "run_specialist_analysis")
     graph.add_edge("run_specialist_analysis", "aggregate_evidence")
-    graph.add_edge("aggregate_evidence", "generate_investigation_response")
+    graph.add_edge("aggregate_evidence", "assess_specialist_handoff")
+    graph.add_edge("assess_specialist_handoff", "run_specialist_handoff")
+    graph.add_edge("run_specialist_handoff", "generate_investigation_response")
     graph.add_edge("generate_investigation_response", END)
     graph.add_edge("service_lookup_response", END)
     graph.add_edge("deployment_analysis_response", END)
@@ -83,6 +89,12 @@ def _initial_state(payload: InvestigationRequest, request_id: str | None) -> Inv
         "confidence": None,
         "requires_approval": False,
         "active_agent": None,
+        "previous_active_agent": None,
+        "handoff_decision": None,
+        "handoff_reason": None,
+        "handoff_target": None,
+        "handoff_timestamp": None,
+        "specialist_result": None,
         "final_response": None,
         "errors": [],
     }

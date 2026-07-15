@@ -21,5 +21,11 @@ class InvestigationState(TypedDict, total=False):
     confidence: float | None
     requires_approval: bool
     active_agent: str | None
+    previous_active_agent: str | None
+    handoff_decision: dict[str, Any] | None
+    handoff_reason: str | None
+    handoff_target: str | None
+    handoff_timestamp: str | None
+    specialist_result: dict[str, Any] | None
     final_response: dict[str, Any] | None
     errors: list[str]

@@ -3,6 +3,13 @@ from typing import Any
 from uuid import uuid4
 
 from app.graph.dependencies import GraphDependencies
+from app.graph.handoffs import (
+    HandoffDecision,
+    assess_handoff,
+    handoff_timestamp,
+    run_database_specialist,
+    validate_handoff_target,
+)
 from app.graph.state import InvestigationState
 from app.graph.subagents import (
     SpecialistFinding,
@@ -210,6 +217,73 @@ def aggregate_evidence(state: InvestigationState) -> InvestigationState:
     return next_state
 
 
+def assess_specialist_handoff(state: InvestigationState) -> InvestigationState:
+    node = "assess_specialist_handoff"
+    _log_node("graph_node_entered", state, node)
+    parsed_findings = [
+        SpecialistFinding.model_validate(finding)
+        for finding in state.get("specialist_findings", [])
+    ]
+    decision = assess_handoff(parsed_findings)
+    next_state: InvestigationState = {
+        "active_agent": "incident_coordinator",
+        "handoff_decision": decision.model_dump(mode="json", exclude_none=True),
+        "handoff_reason": decision.reason if decision.should_handoff else None,
+        "handoff_target": decision.target_agent if decision.should_handoff else None,
+    }
+    _log_node("graph_node_completed", {**state, **next_state}, node)
+    return next_state
+
+
+def run_specialist_handoff(state: InvestigationState) -> InvestigationState:
+    node = "run_specialist_handoff"
+    _log_node("graph_node_entered", state, node)
+    raw_decision = state.get("handoff_decision")
+    if not raw_decision:
+        next_state: InvestigationState = {"active_agent": "incident_coordinator"}
+        _log_node("graph_node_completed", {**state, **next_state}, node)
+        return next_state
+
+    decision = HandoffDecision.model_validate(raw_decision)
+    try:
+        target = validate_handoff_target(decision)
+    except ValueError as exc:
+        logger.exception(
+            "graph_node_failed",
+            extra={
+                "request_id": state.get("request_id"),
+                "investigation_id": state.get("investigation_id"),
+                "node": node,
+                "handoff_target": decision.target_agent,
+            },
+        )
+        raise WorkflowExecutionError(str(exc)) from exc
+
+    if target is None:
+        next_state = {
+            "active_agent": "incident_coordinator",
+            "previous_active_agent": state.get("active_agent"),
+        }
+        _log_node("graph_node_completed", {**state, **next_state}, node)
+        return next_state
+
+    parsed_findings = [
+        SpecialistFinding.model_validate(finding)
+        for finding in state.get("specialist_findings", [])
+    ]
+    result = run_database_specialist(decision, parsed_findings)
+    next_state = {
+        "previous_active_agent": state.get("active_agent") or "incident_coordinator",
+        "active_agent": "incident_coordinator",
+        "handoff_reason": decision.reason,
+        "handoff_target": target,
+        "handoff_timestamp": handoff_timestamp(),
+        "specialist_result": result.model_dump(mode="json", exclude_none=True),
+    }
+    _log_node("graph_node_completed", {**state, **next_state}, node)
+    return next_state
+
+
 def generate_investigation_response(state: InvestigationState) -> InvestigationState:
     node = "generate_investigation_response"
     _log_node("graph_node_entered", state, node)
@@ -228,6 +302,12 @@ def generate_investigation_response(state: InvestigationState) -> InvestigationS
         "recommendations": state.get("recommendations") or [],
         "confidence": state.get("confidence"),
         "requires_approval": state.get("requires_approval", False),
+        "active_agent": state.get("active_agent"),
+        "handoff_decision": state.get("handoff_decision"),
+        "handoff_reason": state.get("handoff_reason"),
+        "handoff_target": state.get("handoff_target"),
+        "handoff_timestamp": state.get("handoff_timestamp"),
+        "specialist_result": state.get("specialist_result"),
     }
     next_state: InvestigationState = {
         "active_agent": "incident_coordinator",
