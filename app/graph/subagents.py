@@ -3,12 +3,18 @@ from typing import Callable, Literal
 
 from pydantic import BaseModel, Field
 
-from app.shopflow.tools import (
-    get_deployment_diff,
-    get_metrics,
-    get_recent_deployments,
-    search_logs,
-    search_runbooks,
+from app.shopflow.tools import get_metrics
+from app.skills import get_skill
+from app.skills.deployment_comparison import (
+    DeploymentComparisonRequest,
+    DeploymentComparisonResult,
+)
+from app.skills.incident_timeline import IncidentTimelineRequest, IncidentTimelineResult
+from app.skills.log_investigation import LogInvestigationRequest, LogInvestigationResult
+from app.skills.models import SkillEvidence
+from app.skills.runbook_retrieval import (
+    RunbookRetrievalRequest,
+    RunbookRetrievalResult,
 )
 
 AgentName = Literal[
@@ -47,31 +53,32 @@ class SpecialistFinding(BaseModel):
     hypotheses: list[Hypothesis] = Field(default_factory=list)
     missing_information: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
+    skills_used: list[str] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 def run_log_analysis(input_data: SpecialistInput) -> SpecialistFinding:
-    response = search_logs(
-        service_name=input_data.service_name,
-        environment=input_data.environment,  # type: ignore[arg-type]
-        query="shipping_region",
-        level="ERROR",
-    )
-    evidence = [
-        EvidenceItem(
-            source_type=source.source_type,
-            source_id=source.source_id,
-            location=source.location,
-            timestamp=log.timestamp.isoformat(),
-            detail=f"{log.level} in {log.component}: {log.message}",
+    skill = get_skill("log_investigation")
+    result = skill.execute(
+        LogInvestigationRequest(
+            service_name=input_data.service_name,
+            environment=input_data.environment,
+            query="shipping_region",
+            level="ERROR",
         )
-        for log, source in zip(response.logs, response.source_references, strict=False)
-    ]
-    if not response.found:
+    )
+    log_result = LogInvestigationResult.model_validate(result)
+    timeline = _build_timeline(log_result.evidence)
+    evidence = _to_agent_evidence(log_result.evidence)
+    if timeline.found:
+        evidence = _timeline_ordered_evidence(evidence, timeline)
+
+    if not log_result.found:
         return SpecialistFinding(
             agent="log_analysis",
-            summary=response.message,
-            missing_information=["No matching checkout database write errors were found."],
+            summary=log_result.message,
+            missing_information=log_result.missing_information,
+            skills_used=["log_investigation", "incident_timeline"],
         )
 
     return SpecialistFinding(
@@ -84,6 +91,7 @@ def run_log_analysis(input_data: SpecialistInput) -> SpecialistFinding:
                 confidence=0.88,
             )
         ],
+        skills_used=["log_investigation", "incident_timeline"],
         confidence=0.88,
     )
 
@@ -131,44 +139,30 @@ def run_metrics_analysis(input_data: SpecialistInput) -> SpecialistFinding:
 
 
 def run_deployment_analysis(input_data: SpecialistInput) -> SpecialistFinding:
-    deployments_response = get_recent_deployments(
-        service_name=input_data.service_name,
-        environment=input_data.environment,  # type: ignore[arg-type]
-        limit=1,
+    skill = get_skill("deployment_comparison")
+    result = skill.execute(
+        DeploymentComparisonRequest(
+            service_name=input_data.service_name,
+            environment=input_data.environment,
+            deployment_id=input_data.deployment_id,
+        )
     )
-    if not deployments_response.found or not deployments_response.deployments:
+    deployment_result = DeploymentComparisonResult.model_validate(result)
+    timeline = _build_timeline(deployment_result.evidence)
+    evidence = _to_agent_evidence(deployment_result.evidence)
+    if timeline.found:
+        evidence = _timeline_ordered_evidence(evidence, timeline)
+
+    if not deployment_result.found:
         return SpecialistFinding(
             agent="deployment_analysis",
-            summary=deployments_response.message,
-            missing_information=["No recent deployment was found for the service."],
+            summary=deployment_result.message,
+            missing_information=deployment_result.missing_information,
+            skills_used=["deployment_comparison", "incident_timeline"],
         )
 
-    deployment = deployments_response.deployments[0]
-    diff_response = get_deployment_diff(deployment_id=input_data.deployment_id or deployment.deployment_id)
-    evidence = [
-        EvidenceItem(
-            source_type=source.source_type,
-            source_id=source.source_id,
-            location=source.location,
-            timestamp=deployment.deployed_at.isoformat(),
-            detail=f"Deployment {deployment.version} status={deployment.status}",
-        )
-        for source in deployments_response.source_references
-    ]
-    for change in diff_response.changes:
-        evidence.append(
-            EvidenceItem(
-                source_type="deployment",
-                source_id=change.change_id,
-                location=change.path,
-                timestamp=deployment.deployed_at.isoformat(),
-                detail=f"{change.change_type}: {change.description}",
-            )
-        )
-
-    has_database_migration = any(change.change_type == "database_migration" for change in diff_response.changes)
     hypotheses = []
-    if has_database_migration:
+    if deployment_result.has_database_migration:
         hypotheses.append(
             Hypothesis(
                 description="The latest deployment included a high-risk database migration before the failures.",
@@ -180,49 +174,40 @@ def run_deployment_analysis(input_data: SpecialistInput) -> SpecialistFinding:
         summary="Deployment v2.1.0 included a database migration shortly before failures began.",
         evidence=evidence,
         hypotheses=hypotheses,
-        confidence=0.9 if has_database_migration else 0.55,
+        skills_used=["deployment_comparison", "incident_timeline"],
+        confidence=0.9 if deployment_result.has_database_migration else 0.55,
     )
 
 
 def run_runbook_analysis(input_data: SpecialistInput) -> SpecialistFinding:
-    response = search_runbooks(
-        service_name=input_data.service_name,
-        query="database",
-    )
-    evidence = []
-    for runbook, source in zip(response.runbooks, response.source_references, strict=False):
-        approval_steps = [
-            step.title for step in runbook.steps if step.requires_approval
-        ]
-        detail = f"{runbook.title}: {runbook.summary}"
-        if approval_steps:
-            detail = f"{detail} Approval required for: {', '.join(approval_steps)}."
-        evidence.append(
-            EvidenceItem(
-                source_type=source.source_type,
-                source_id=source.source_id,
-                location=source.location,
-                detail=detail,
-            )
+    skill = get_skill("runbook_retrieval")
+    result = skill.execute(
+        RunbookRetrievalRequest(
+            service_name=input_data.service_name,
+            query="database",
         )
+    )
+    runbook_result = RunbookRetrievalResult.model_validate(result)
 
-    if not response.found:
+    if not runbook_result.found:
         return SpecialistFinding(
             agent="runbook_analysis",
-            summary=response.message,
-            missing_information=["No matching operational runbook was found."],
+            summary=runbook_result.message,
+            missing_information=runbook_result.missing_information,
+            skills_used=["runbook_retrieval"],
         )
 
     return SpecialistFinding(
         agent="runbook_analysis",
         summary="Runbook guidance recommends safe rollback review and approval for database write failures.",
-        evidence=evidence,
+        evidence=_to_agent_evidence(runbook_result.evidence),
         hypotheses=[
             Hypothesis(
                 description="Rollback or migration remediation should require human approval.",
                 confidence=0.78,
             )
         ],
+        skills_used=["runbook_retrieval"],
         confidence=0.78,
     )
 
@@ -270,3 +255,30 @@ def _agent_name(agent: Callable[[SpecialistInput], SpecialistFinding]) -> AgentN
         "run_runbook_analysis": "runbook_analysis",
     }
     return names.get(agent.__name__, "log_analysis")
+
+
+def _to_agent_evidence(evidence: list[SkillEvidence]) -> list[EvidenceItem]:
+    return [
+        EvidenceItem(
+            source_type=item.source_type,
+            source_id=item.source_id,
+            location=item.location,
+            detail=item.detail,
+            timestamp=item.timestamp,
+        )
+        for item in evidence
+    ]
+
+
+def _build_timeline(evidence: list[SkillEvidence]) -> IncidentTimelineResult:
+    timeline_skill = get_skill("incident_timeline")
+    result = timeline_skill.execute(IncidentTimelineRequest(evidence=evidence))
+    return IncidentTimelineResult.model_validate(result)
+
+
+def _timeline_ordered_evidence(
+    evidence: list[EvidenceItem],
+    timeline: IncidentTimelineResult,
+) -> list[EvidenceItem]:
+    order = {event.source_id: index for index, event in enumerate(timeline.events)}
+    return sorted(evidence, key=lambda item: order.get(item.source_id, len(order)))

@@ -130,14 +130,14 @@ A task may only be marked completed after:
 
 # Phase 7: Skills
 
-- [ ] Define skill interface
-- [ ] Implement skill registry
-- [ ] Add log investigation skill
-- [ ] Add deployment comparison skill
-- [ ] Add incident timeline skill
-- [ ] Add runbook retrieval skill
-- [ ] Add skill tests
-- [ ] Verify at least one skill is used by multiple agents
+- [x] Define skill interface
+- [x] Implement skill registry
+- [x] Add log investigation skill
+- [x] Add deployment comparison skill
+- [x] Add incident timeline skill
+- [x] Add runbook retrieval skill
+- [x] Add skill tests
+- [x] Verify at least one skill is used by multiple agents
 
 # Phase 8: Handoffs
 
