@@ -6,10 +6,11 @@ from app.api.routes.router import router as request_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
+from app.graph.dependencies import GraphDependencies
 from app.middleware.request_id import RequestIdMiddleware
 
 
-def create_app() -> FastAPI:
+def create_app(graph_dependencies: GraphDependencies | None = None) -> FastAPI:
     settings = get_settings()
     configure_logging(settings)
 
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         debug=settings.debug,
     )
+    app.state.graph_dependencies = graph_dependencies
     app.add_middleware(RequestIdMiddleware)
     register_exception_handlers(app)
     app.include_router(health_router)

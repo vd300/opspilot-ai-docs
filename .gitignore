@@ -12,3 +12,7 @@ wheels/
 
 env files
 .env
+
+# Local persistence
+data/
+*.sqlite3

@@ -153,12 +153,12 @@ A task may only be marked completed after:
 
 # Phase 9: Persistence
 
-- [ ] Add investigation repository
-- [ ] Add checkpointing
-- [ ] Save investigation state
-- [ ] Save tool calls
-- [ ] Save handoff events
-- [ ] Add restart recovery test
+- [x] Add investigation repository
+- [x] Add checkpointing
+- [x] Save investigation state
+- [x] Save tool calls
+- [x] Save handoff events
+- [x] Add restart recovery test
 
 # Phase 10: Human approval
 

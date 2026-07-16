@@ -1,6 +1,7 @@
 import logging
 import time
 from typing import Any
+from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
 
@@ -65,13 +66,13 @@ def compile_investigation_graph(dependencies: GraphDependencies | None = None):
     graph.add_edge("general_question_response", END)
     graph.add_edge("unsupported_route_response", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=dependencies.checkpointer)
 
 
 def _initial_state(payload: InvestigationRequest, request_id: str | None) -> InvestigationState:
     return {
         "request_id": request_id or payload.request_id,
-        "investigation_id": payload.investigation_id,
+        "investigation_id": payload.investigation_id or str(uuid4()),
         "user_query": payload.question,
         "service_name": payload.service_name,
         "incident_id": payload.incident_id,
@@ -106,8 +107,10 @@ def run_investigation_workflow(
     request_id: str | None = None,
     dependencies: GraphDependencies | None = None,
 ) -> InvestigationResponse:
+    dependencies = dependencies or get_graph_dependencies()
     graph = compile_investigation_graph(dependencies)
     initial_state = _initial_state(payload, request_id)
+    config = {"configurable": {"thread_id": initial_state["investigation_id"]}}
     started_at = time.perf_counter()
     logger.info(
         "graph_invocation_started",
@@ -117,7 +120,7 @@ def run_investigation_workflow(
         },
     )
     try:
-        result: dict[str, Any] = graph.invoke(initial_state)
+        result: dict[str, Any] = graph.invoke(initial_state, config=config)
     except Exception:
         duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
         logger.exception(
@@ -143,4 +146,22 @@ def run_investigation_workflow(
     final_response = result.get("final_response")
     if not isinstance(final_response, dict):
         raise RuntimeError("Graph completed without a structured final response.")
-    return InvestigationResponse.model_validate(final_response)
+    response = InvestigationResponse.model_validate(final_response)
+    if dependencies.investigation_repository is not None:
+        dependencies.investigation_repository.save_completed_investigation(
+            state=result,
+            response=response,
+            checkpoint_thread_id=initial_state["investigation_id"],
+        )
+    return response
+
+
+def load_investigation_response(
+    investigation_id: str,
+    *,
+    dependencies: GraphDependencies | None = None,
+) -> InvestigationResponse:
+    dependencies = dependencies or get_graph_dependencies()
+    if dependencies.investigation_repository is None:
+        raise RuntimeError("Investigation repository is not configured.")
+    return dependencies.investigation_repository.get_response(investigation_id)

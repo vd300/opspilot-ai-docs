@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="local", validation_alias="APP_ENV")
     debug: bool = False
     log_level: str = "INFO"
+    persistence_database_path: str = "data/opspilot.sqlite3"
 
     model_config = SettingsConfigDict(
         env_file=".env",
