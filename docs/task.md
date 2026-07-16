@@ -171,6 +171,19 @@ A task may only be marked completed after:
 - [x] Test approve flow
 - [x] Test reject flow
 
+# Phase 10.5: Real LLM integration
+
+- [x] Add centralized model configuration
+- [x] Add structured model factory
+- [x] Add optional real model provider
+- [x] Keep fake structured model for normal tests
+- [x] Inject model only into reasoning components
+- [x] Use structured output for routing
+- [x] Use structured output for diagnosis
+- [x] Use structured output for handoff decisions
+- [x] Keep tools, skills, graph routing, validation, persistence, and approvals deterministic
+- [x] Add optional live-model validation gated by credentials
+
 # Phase 11: Observability
 
 - [ ] Add HTTP metrics

@@ -146,6 +146,23 @@ Implement:
 
 No real production action will be executed.
 
+## Phase 10.5: Real LLM integration
+
+Implement:
+
+- centralized model configuration
+- structured model factory
+- optional OpenAI Responses API provider
+- fake structured model for normal tests
+- router classifier integration
+- structured diagnosis generation
+- structured handoff decision generation
+- optional live-model validation when credentials exist
+
+Tools, skills, graph routing, validation, persistence, and approvals must remain
+deterministic. Normal tests must continue to run without credentials, network
+access, or nondeterministic model responses.
+
 ## Phase 11: Observability
 
 Implement:

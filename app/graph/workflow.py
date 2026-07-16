@@ -16,14 +16,14 @@ from app.graph.approvals import (
 )
 from app.graph.dependencies import GraphDependencies, get_graph_dependencies
 from app.graph.nodes import (
-    aggregate_evidence,
-    assess_specialist_handoff,
     await_human_approval,
     create_investigation_plan,
     deployment_analysis_response,
     finalize_human_approval,
     general_question_response,
     generate_investigation_response,
+    make_aggregate_evidence_node,
+    make_assess_specialist_handoff_node,
     make_route_request_node,
     prepare_human_approval,
     report_generation_response,
@@ -49,8 +49,8 @@ def compile_investigation_graph(dependencies: GraphDependencies | None = None):
     graph.add_node("route_request", make_route_request_node(dependencies))
     graph.add_node("create_investigation_plan", create_investigation_plan)
     graph.add_node("run_specialist_analysis", run_specialist_analysis)
-    graph.add_node("aggregate_evidence", aggregate_evidence)
-    graph.add_node("assess_specialist_handoff", assess_specialist_handoff)
+    graph.add_node("aggregate_evidence", make_aggregate_evidence_node(dependencies))
+    graph.add_node("assess_specialist_handoff", make_assess_specialist_handoff_node(dependencies))
     graph.add_node("run_specialist_handoff", run_specialist_handoff)
     graph.add_node("generate_investigation_response", generate_investigation_response)
     graph.add_node("prepare_human_approval", prepare_human_approval)

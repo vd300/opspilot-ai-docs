@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.graph.dependencies import GraphDependencies
 from app.main import create_app
 from app.router import OpsRoute, RequestRouter, RouteDecision, RouterInput
 
@@ -16,6 +17,18 @@ class FakeClassifier:
         if isinstance(self.result, BaseException):
             raise self.result
         return self.result
+
+
+class FakeRouter:
+    def route(self, router_input: RouterInput, *, request_id: str | None = None):
+        return RouteDecision(
+            route=OpsRoute.SERVICE_LOOKUP,
+            service_name="checkout-service",
+            service_found=True,
+            confidence=0.9,
+            reason="Test router selected service lookup.",
+            fallback_used=True,
+        )
 
 
 def route(question: str, **kwargs) -> RouteDecision:
@@ -123,6 +136,29 @@ def test_high_confidence_classifier_can_handle_ambiguous_general_request() -> No
     assert decision.fallback_used is False
 
 
+def test_classifier_cannot_invent_service_entities() -> None:
+    classifier = FakeClassifier(
+        {
+            "route": "runbook_search",
+            "service_name": "checkout recovery",
+            "service_found": True,
+            "matched_services": ["checkout recovery"],
+            "confidence": 0.95,
+            "reason": "The user is asking for a procedure.",
+        }
+    )
+
+    decision = RequestRouter(classifier=classifier).route(
+        RouterInput(question="I need the SOP for checkout recovery")
+    )
+
+    assert decision.route == OpsRoute.RUNBOOK_SEARCH
+    assert decision.fallback_used is False
+    assert decision.service_name is None
+    assert decision.service_found is None
+    assert decision.matched_services == []
+
+
 @pytest.mark.parametrize(
     ("classifier_result", "failure_type"),
     [
@@ -179,7 +215,7 @@ def test_router_evaluation_fixture_exists() -> None:
 
 
 def test_router_classify_endpoint_preserves_request_id() -> None:
-    client = TestClient(create_app())
+    client = TestClient(create_app(graph_dependencies=GraphDependencies(router=FakeRouter())))  # type: ignore[arg-type]
 
     response = client.post(
         "/api/v1/router/classify",

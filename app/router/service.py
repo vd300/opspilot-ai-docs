@@ -59,8 +59,16 @@ class RequestRouter:
             failure_type = "schema_validation"
         except ValueError as exc:
             failure_type = str(exc) or "unsupported_route"
-        except Exception:
+        except Exception as exc:
             failure_type = "provider_error"
+            logger.warning(
+                "route_classifier_failed",
+                extra={
+                    "request_id": request_id,
+                    "error_type": type(exc).__name__,
+                    "error_detail": str(exc),
+                },
+            )
 
         fallback = deterministic.model_copy(
             update={"fallback_used": True, "classification_failure_type": failure_type}
@@ -102,11 +110,11 @@ class RequestRouter:
     def _merge_entities(self, router_input: RouterInput, decision: RouteDecision) -> RouteDecision:
         entities = self._extract_entities(router_input)
         updates: dict[str, Any] = {
-            "service_name": entities["service_name"] or decision.service_name,
-            "service_found": entities["service_found"] if entities["service_name"] else decision.service_found,
-            "matched_services": entities["matched_services"] or decision.matched_services,
-            "incident_id": entities["incident_id"] or decision.incident_id,
-            "deployment_id": entities["deployment_id"] or decision.deployment_id,
+            "service_name": entities["service_name"],
+            "service_found": entities["service_found"],
+            "matched_services": entities["matched_services"],
+            "incident_id": entities["incident_id"],
+            "deployment_id": entities["deployment_id"],
         }
         return decision.model_copy(update=updates)
 

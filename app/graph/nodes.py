@@ -15,6 +15,7 @@ from app.graph.handoffs import (
     run_database_specialist,
     validate_handoff_target,
 )
+from app.graph.reasoning import generate_diagnosis
 from app.graph.state import InvestigationState
 from app.graph.subagents import (
     SpecialistFinding,
@@ -175,6 +176,42 @@ def run_specialist_analysis(state: InvestigationState) -> InvestigationState:
     return next_state
 
 
+def make_aggregate_evidence_node(dependencies: GraphDependencies):
+    def aggregate_evidence(state: InvestigationState) -> InvestigationState:
+        node = "aggregate_evidence"
+        _log_node("graph_node_entered", state, node)
+        parsed_findings = [
+            SpecialistFinding.model_validate(finding)
+            for finding in state.get("specialist_findings", [])
+        ]
+        evidence = collect_unique_evidence(parsed_findings)
+        diagnosis = generate_diagnosis(
+            parsed_findings,
+            evidence,
+            model=dependencies.reasoning_model,
+        )
+        errors = list(state.get("errors") or [])
+        errors.extend(
+            f"{finding.agent}: {error}"
+            for finding in parsed_findings
+            for error in finding.errors
+        )
+
+        next_state: InvestigationState = {
+            "active_agent": "incident_coordinator",
+            "evidence": [item.model_dump(mode="json", exclude_none=True) for item in evidence],
+            "preliminary_diagnosis": diagnosis.preliminary_diagnosis,
+            "recommendations": diagnosis.recommendations,
+            "confidence": diagnosis.confidence,
+            "requires_approval": diagnosis.requires_approval,
+            "errors": errors,
+        }
+        _log_node("graph_node_completed", {**state, **next_state}, node)
+        return next_state
+
+    return aggregate_evidence
+
+
 def aggregate_evidence(state: InvestigationState) -> InvestigationState:
     node = "aggregate_evidence"
     _log_node("graph_node_entered", state, node)
@@ -183,43 +220,46 @@ def aggregate_evidence(state: InvestigationState) -> InvestigationState:
         for finding in state.get("specialist_findings", [])
     ]
     evidence = collect_unique_evidence(parsed_findings)
-    missing_information = [
-        missing
-        for finding in parsed_findings
-        for missing in finding.missing_information
-    ]
     errors = list(state.get("errors") or [])
     errors.extend(
         f"{finding.agent}: {error}"
         for finding in parsed_findings
         for error in finding.errors
     )
-    confidence = _combined_confidence(parsed_findings)
-    diagnosis = (
-        "The likely cause of INC-001 is the checkout-service v2.1.0 database migration "
-        "adding or requiring shipping_region without compatible write-path data. "
-        "Logs show insert failures, metrics show the HTTP 500 spike, and deployment "
-        "evidence ties the failure window to a high-risk database migration."
-    )
-    if missing_information:
-        diagnosis = f"{diagnosis} Missing information: {'; '.join(missing_information)}."
+    diagnosis = generate_diagnosis(parsed_findings, evidence)
 
     next_state: InvestigationState = {
         "active_agent": "incident_coordinator",
         "evidence": [item.model_dump(mode="json", exclude_none=True) for item in evidence],
-        "preliminary_diagnosis": diagnosis,
-        "recommendations": [
-            "Pause further checkout-service deployments until the migration is reviewed.",
-            "Confirm whether shipping_region is required by the new schema and absent from checkout writes.",
-            "Use the checkout database write failures runbook before rollback or migration remediation.",
-            "Get human approval before any production rollback or schema change.",
-        ],
-        "confidence": confidence,
-        "requires_approval": True,
+        "preliminary_diagnosis": diagnosis.preliminary_diagnosis,
+        "recommendations": diagnosis.recommendations,
+        "confidence": diagnosis.confidence,
+        "requires_approval": diagnosis.requires_approval,
         "errors": errors,
     }
     _log_node("graph_node_completed", {**state, **next_state}, node)
     return next_state
+
+
+def make_assess_specialist_handoff_node(dependencies: GraphDependencies):
+    def assess_specialist_handoff(state: InvestigationState) -> InvestigationState:
+        node = "assess_specialist_handoff"
+        _log_node("graph_node_entered", state, node)
+        parsed_findings = [
+            SpecialistFinding.model_validate(finding)
+            for finding in state.get("specialist_findings", [])
+        ]
+        decision = assess_handoff(parsed_findings, model=dependencies.reasoning_model)
+        next_state: InvestigationState = {
+            "active_agent": "incident_coordinator",
+            "handoff_decision": decision.model_dump(mode="json", exclude_none=True),
+            "handoff_reason": decision.reason if decision.should_handoff else None,
+            "handoff_target": decision.target_agent if decision.should_handoff else None,
+        }
+        _log_node("graph_node_completed", {**state, **next_state}, node)
+        return next_state
+
+    return assess_specialist_handoff
 
 
 def assess_specialist_handoff(state: InvestigationState) -> InvestigationState:
@@ -344,13 +384,6 @@ def finalize_human_approval(state: InvestigationState) -> InvestigationState:
     next_state = finalize_approval_response(state)
     _log_node("graph_node_completed", {**state, **next_state}, node)
     return next_state
-
-
-def _combined_confidence(findings: list) -> float:
-    confident_findings = [finding.confidence for finding in findings if finding.confidence > 0]
-    if not confident_findings:
-        return 0.0
-    return round(sum(confident_findings) / len(confident_findings), 2)
 
 
 def _temporary_response(

@@ -25,6 +25,8 @@ class JsonFormatter(logging.Formatter):
             "node",
             "route",
             "active_agent",
+            "error_type",
+            "error_detail",
         ):
             value = getattr(record, key, None)
             if value is not None:
