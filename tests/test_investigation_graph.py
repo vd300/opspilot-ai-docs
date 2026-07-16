@@ -176,7 +176,7 @@ def test_graph_compiles() -> None:
 @pytest.mark.parametrize(
     ("route", "expected_status", "expected_plan"),
     [
-        (OpsRoute.INCIDENT_INVESTIGATION, "preliminary_diagnosis", True),
+        (OpsRoute.INCIDENT_INVESTIGATION, "approval_required", True),
         (OpsRoute.SERVICE_LOOKUP, "selected", False),
         (OpsRoute.DEPLOYMENT_ANALYSIS, "selected", False),
         (OpsRoute.RUNBOOK_SEARCH, "selected", False),
@@ -231,12 +231,14 @@ def test_investigation_endpoint_accepts_valid_request() -> None:
     assert body["request_id"] == "api-investigation-1"
     assert body["investigation_id"]
     assert body["route"] == "incident_investigation"
-    assert body["status"] == "preliminary_diagnosis"
+    assert body["status"] == "approval_required"
     assert body["investigation_plan"]
     assert body["specialist_findings"]
     assert body["evidence"]
     assert "database migration" in body["preliminary_diagnosis"]
     assert body["requires_approval"] is True
+    assert body["approval_status"] == "pending"
+    assert body["approval_requested_action"] == "simulated_checkout_service_rollback"
 
 
 def test_investigation_workflow_produces_inc001_preliminary_diagnosis() -> None:
@@ -251,7 +253,7 @@ def test_investigation_workflow_produces_inc001_preliminary_diagnosis() -> None:
         dependencies=deps(OpsRoute.INCIDENT_INVESTIGATION),
     )
 
-    assert response.status == "preliminary_diagnosis"
+    assert response.status == "approval_required"
     assert response.preliminary_diagnosis is not None
     assert "shipping_region" in response.preliminary_diagnosis
     assert response.confidence is not None
@@ -276,6 +278,9 @@ def test_investigation_workflow_produces_inc001_preliminary_diagnosis() -> None:
     assert response.specialist_result is not None
     assert response.specialist_result["agent"] == "database_specialist"
     assert response.active_agent == "incident_coordinator"
+    assert response.approval_status == "pending"
+    assert response.approval_id
+    assert response.approval_expires_at
 
 
 def test_handoff_assessment_skips_non_database_evidence() -> None:

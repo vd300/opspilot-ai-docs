@@ -4,16 +4,28 @@ from typing import Any
 from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command
 
+from app.graph.approvals import (
+    ApprovalStateError,
+    EXPIRED,
+    PENDING,
+    apply_approval_decision,
+    finalize_approval_response,
+    is_approval_expired,
+)
 from app.graph.dependencies import GraphDependencies, get_graph_dependencies
 from app.graph.nodes import (
     aggregate_evidence,
     assess_specialist_handoff,
+    await_human_approval,
     create_investigation_plan,
     deployment_analysis_response,
+    finalize_human_approval,
     general_question_response,
     generate_investigation_response,
     make_route_request_node,
+    prepare_human_approval,
     report_generation_response,
     runbook_search_response,
     run_specialist_analysis,
@@ -24,7 +36,7 @@ from app.graph.nodes import (
 )
 from app.graph.routing import ROUTE_TO_NODE, select_route_node
 from app.graph.state import InvestigationState
-from app.schemas.investigations import InvestigationRequest, InvestigationResponse
+from app.schemas.investigations import ApprovalDecisionRequest, InvestigationRequest, InvestigationResponse
 
 logger = logging.getLogger("opspilot.graph")
 
@@ -41,6 +53,9 @@ def compile_investigation_graph(dependencies: GraphDependencies | None = None):
     graph.add_node("assess_specialist_handoff", assess_specialist_handoff)
     graph.add_node("run_specialist_handoff", run_specialist_handoff)
     graph.add_node("generate_investigation_response", generate_investigation_response)
+    graph.add_node("prepare_human_approval", prepare_human_approval)
+    graph.add_node("await_human_approval", await_human_approval)
+    graph.add_node("finalize_human_approval", finalize_human_approval)
     graph.add_node("service_lookup_response", service_lookup_response)
     graph.add_node("deployment_analysis_response", deployment_analysis_response)
     graph.add_node("runbook_search_response", runbook_search_response)
@@ -58,7 +73,10 @@ def compile_investigation_graph(dependencies: GraphDependencies | None = None):
     graph.add_edge("aggregate_evidence", "assess_specialist_handoff")
     graph.add_edge("assess_specialist_handoff", "run_specialist_handoff")
     graph.add_edge("run_specialist_handoff", "generate_investigation_response")
-    graph.add_edge("generate_investigation_response", END)
+    graph.add_edge("generate_investigation_response", "prepare_human_approval")
+    graph.add_edge("prepare_human_approval", "await_human_approval")
+    graph.add_edge("await_human_approval", "finalize_human_approval")
+    graph.add_edge("finalize_human_approval", END)
     graph.add_edge("service_lookup_response", END)
     graph.add_edge("deployment_analysis_response", END)
     graph.add_edge("runbook_search_response", END)
@@ -89,6 +107,14 @@ def _initial_state(payload: InvestigationRequest, request_id: str | None) -> Inv
         "recommendations": [],
         "confidence": None,
         "requires_approval": False,
+        "approval_id": None,
+        "approval_status": None,
+        "approval_requested_action": None,
+        "approval_expires_at": None,
+        "approval_decision": None,
+        "approval_decided_by": None,
+        "approval_decided_at": None,
+        "approval_result": None,
         "active_agent": None,
         "previous_active_agent": None,
         "handoff_decision": None,
@@ -154,6 +180,117 @@ def run_investigation_workflow(
             checkpoint_thread_id=initial_state["investigation_id"],
         )
     return response
+
+
+class ApprovalConflictError(RuntimeError):
+    pass
+
+
+class ApprovalExpiredError(RuntimeError):
+    pass
+
+
+def resume_investigation_approval(
+    investigation_id: str,
+    decision: ApprovalDecisionRequest,
+    *,
+    request_id: str | None = None,
+    dependencies: GraphDependencies | None = None,
+) -> InvestigationResponse:
+    dependencies = dependencies or get_graph_dependencies()
+    if dependencies.investigation_repository is None:
+        raise RuntimeError("Investigation repository is not configured.")
+
+    record = dependencies.investigation_repository.get_investigation(investigation_id)
+    state = dict(record.state)
+    if state.get("approval_status") != PENDING:
+        raise ApprovalConflictError("Approval has already been decided or is not pending.")
+
+    decision_data = decision.model_dump(mode="json")
+    if is_approval_expired(state):
+        updated_state = {
+            **state,
+            **apply_approval_decision(state, decision_data),
+        }
+        updated_state = {
+            **updated_state,
+            **finalize_approval_response(updated_state),
+        }
+        response = _response_from_state(updated_state)
+        dependencies.investigation_repository.save_completed_investigation(
+            state=updated_state,
+            response=response,
+            checkpoint_thread_id=record.checkpoint_thread_id,
+        )
+        dependencies.investigation_repository.record_approval_decision(
+            investigation_id=investigation_id,
+            request_id=request_id or record.request_id,
+            approval_id=state.get("approval_id"),
+            decision=decision_data["decision"],
+            decided_by=decision_data["decided_by"],
+            comment=decision_data.get("comment"),
+            outcome=EXPIRED,
+            result=updated_state.get("approval_result"),
+        )
+        raise ApprovalExpiredError("Approval request has expired.")
+
+    resumed_state = _resume_with_checkpoint_if_available(
+        dependencies,
+        record.checkpoint_thread_id,
+        decision_data,
+    )
+    if resumed_state is None:
+        updated_state = {**state, **apply_approval_decision(state, decision_data)}
+        resumed_state = {**updated_state, **finalize_approval_response(updated_state)}
+
+    response = _response_from_state(resumed_state)
+    dependencies.investigation_repository.save_completed_investigation(
+        state=resumed_state,
+        response=response,
+        checkpoint_thread_id=record.checkpoint_thread_id,
+    )
+    dependencies.investigation_repository.record_approval_decision(
+        investigation_id=investigation_id,
+        request_id=request_id or response.request_id,
+        approval_id=resumed_state.get("approval_id"),
+        decision=decision_data["decision"],
+        decided_by=decision_data["decided_by"],
+        comment=decision_data.get("comment"),
+        outcome=resumed_state.get("approval_status"),
+        result=resumed_state.get("approval_result"),
+    )
+    return response
+
+
+def _resume_with_checkpoint_if_available(
+    dependencies: GraphDependencies,
+    checkpoint_thread_id: str,
+    decision_data: dict[str, Any],
+) -> dict[str, Any] | None:
+    if dependencies.checkpointer is None:
+        return None
+    config = {"configurable": {"thread_id": checkpoint_thread_id}}
+    if dependencies.checkpointer.get_tuple(config) is None:
+        return None
+    graph = compile_investigation_graph(dependencies)
+    try:
+        result = graph.invoke(Command(resume=decision_data), config=config)
+    except ApprovalStateError:
+        raise
+    except Exception:
+        logger.exception(
+            "approval_checkpoint_resume_failed",
+            extra={"investigation_id": checkpoint_thread_id},
+        )
+        return None
+    return result
+
+
+def _response_from_state(state: dict[str, Any]) -> InvestigationResponse:
+    final_response = state.get("final_response")
+    if not isinstance(final_response, dict):
+        raise RuntimeError("Graph completed without a structured final response.")
+    return InvestigationResponse.model_validate(final_response)
 
 
 def load_investigation_response(

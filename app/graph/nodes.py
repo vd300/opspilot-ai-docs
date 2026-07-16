@@ -3,6 +3,11 @@ from typing import Any
 from uuid import uuid4
 
 from app.graph.dependencies import GraphDependencies
+from app.graph.approvals import (
+    create_pending_approval,
+    finalize_approval_response,
+    wait_for_human_approval,
+)
 from app.graph.handoffs import (
     HandoffDecision,
     assess_handoff,
@@ -313,6 +318,30 @@ def generate_investigation_response(state: InvestigationState) -> InvestigationS
         "active_agent": "incident_coordinator",
         "final_response": final_response,
     }
+    _log_node("graph_node_completed", {**state, **next_state}, node)
+    return next_state
+
+
+def prepare_human_approval(state: InvestigationState) -> InvestigationState:
+    node = "prepare_human_approval"
+    _log_node("graph_node_entered", state, node)
+    next_state = create_pending_approval(state)
+    _log_node("graph_node_completed", {**state, **next_state}, node)
+    return next_state
+
+
+def await_human_approval(state: InvestigationState) -> InvestigationState:
+    node = "await_human_approval"
+    _log_node("graph_node_entered", state, node)
+    next_state = wait_for_human_approval(state)
+    _log_node("graph_node_completed", {**state, **next_state}, node)
+    return next_state
+
+
+def finalize_human_approval(state: InvestigationState) -> InvestigationState:
+    node = "finalize_human_approval"
+    _log_node("graph_node_entered", state, node)
+    next_state = finalize_approval_response(state)
     _log_node("graph_node_completed", {**state, **next_state}, node)
     return next_state
 

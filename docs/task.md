@@ -162,14 +162,14 @@ A task may only be marked completed after:
 
 # Phase 10: Human approval
 
-- [ ] Add approval-required state
-- [ ] Add workflow interrupt
-- [ ] Add approval endpoint
-- [ ] Add resume behavior
-- [ ] Add approval audit record
-- [ ] Add simulated rollback
-- [ ] Test approve flow
-- [ ] Test reject flow
+- [x] Add approval-required state
+- [x] Add workflow interrupt
+- [x] Add approval endpoint
+- [x] Add resume behavior
+- [x] Add approval audit record
+- [x] Add simulated rollback
+- [x] Test approve flow
+- [x] Test reject flow
 
 # Phase 11: Observability
 

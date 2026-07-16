@@ -20,6 +20,14 @@ class InvestigationState(TypedDict, total=False):
     recommendations: list[str]
     confidence: float | None
     requires_approval: bool
+    approval_id: str | None
+    approval_status: str | None
+    approval_requested_action: str | None
+    approval_expires_at: str | None
+    approval_decision: str | None
+    approval_decided_by: str | None
+    approval_decided_at: str | None
+    approval_result: dict[str, Any] | None
     active_agent: str | None
     previous_active_agent: str | None
     handoff_decision: dict[str, Any] | None

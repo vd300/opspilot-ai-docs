@@ -42,6 +42,20 @@ class InvestigationRepository(Protocol):
     def get_response(self, investigation_id: str) -> InvestigationResponse:
         ...
 
+    def record_approval_decision(
+        self,
+        *,
+        investigation_id: str,
+        request_id: str | None,
+        approval_id: str | None,
+        decision: str,
+        decided_by: str,
+        comment: str | None,
+        outcome: str | None,
+        result: dict[str, Any] | None,
+    ) -> None:
+        ...
+
 
 class SQLiteInvestigationRepository:
     def __init__(self, database_path: str | Path) -> None:
@@ -186,6 +200,56 @@ class SQLiteInvestigationRepository:
             ).fetchall()
         return [_row_to_json(row, ["decision_json", "result_json"]) for row in rows]
 
+    def record_approval_decision(
+        self,
+        *,
+        investigation_id: str,
+        request_id: str | None,
+        approval_id: str | None,
+        decision: str,
+        decided_by: str,
+        comment: str | None,
+        outcome: str | None,
+        result: dict[str, Any] | None,
+    ) -> None:
+        now = _utc_now()
+        with self._connect() as connection:
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute(
+                """
+                INSERT INTO approval_audit (
+                    investigation_id, request_id, approval_id, decision,
+                    decided_by, comment, outcome, result_json, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    investigation_id,
+                    request_id,
+                    approval_id,
+                    decision,
+                    decided_by,
+                    comment,
+                    outcome,
+                    json.dumps(result, sort_keys=True),
+                    now,
+                ),
+            )
+
+    def list_approval_audit(self, investigation_id: str) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT request_id, approval_id, decision, decided_by, comment,
+                       outcome, result_json, created_at
+                FROM approval_audit
+                WHERE investigation_id = ?
+                ORDER BY id
+                """,
+                (investigation_id,),
+            ).fetchall()
+        return [_row_to_json(row, ["result_json"]) for row in rows]
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
         connection.row_factory = sqlite3.Row
@@ -241,6 +305,19 @@ class SQLiteInvestigationRepository:
                     reason TEXT NOT NULL,
                     event_timestamp TEXT,
                     decision_json TEXT NOT NULL,
+                    result_json TEXT,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS approval_audit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    investigation_id TEXT NOT NULL REFERENCES investigations(investigation_id) ON DELETE CASCADE,
+                    request_id TEXT,
+                    approval_id TEXT,
+                    decision TEXT NOT NULL,
+                    decided_by TEXT NOT NULL,
+                    comment TEXT,
+                    outcome TEXT,
                     result_json TEXT,
                     created_at TEXT NOT NULL
                 );
